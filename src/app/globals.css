@@ -1,0 +1,465 @@
+@import "leaflet/dist/leaflet.css";
+
+/* Design System & Theme Variables */
+:root {
+  /* Brand Palette - Modern Jharkhand Government Portal */
+  --brand-primary: #047857; /* Forest Green / Jharkhand emerald */
+  --brand-primary-hover: #065f46;
+  --brand-primary-light: #d1fae5;
+  --brand-accent: #f59e0b; /* Warm Saffron / Solar gold */
+  --brand-accent-hover: #d97706;
+  --brand-accent-light: #fef3c7;
+  --brand-navy: #0f172a;
+  --brand-indigo: #4338ca;
+
+  /* Neutral Spectrum */
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-glass-border: rgba(226, 232, 240, 0.8);
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --text-inverse: #ffffff;
+  
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+
+  /* Priority & Status Colors */
+  --status-critical: #e11d48;
+  --status-critical-bg: #ffe4e6;
+  --status-high: #f97316;
+  --status-high-bg: #ffedd5;
+  --status-medium: #eab308;
+  --status-medium-bg: #fef9c3;
+  --status-low: #10b981;
+  --status-low-bg: #d1fae5;
+
+  --status-submitted: #3b82f6;
+  --status-validated: #8b5cf6;
+  --status-assigned: #f59e0b;
+  --status-inprogress: #06b6d4;
+  --status-resolved: #10b981;
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+
+  /* Border Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Layout */
+  --max-width: 1320px;
+  --header-height: 72px;
+}
+
+[data-theme="dark"] {
+  --bg-main: #0b0f19;
+  --bg-card: #131b2e;
+  --bg-card-hover: #1e293b;
+  --bg-glass: rgba(19, 27, 46, 0.85);
+  --bg-glass-border: rgba(51, 65, 85, 0.6);
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+  
+  --border-light: #1e293b;
+  --border-medium: #334155;
+
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Reset & Base Elements */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+/* Container Utility */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* Typography Helpers */
+.heading-hero {
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.heading-section {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.75rem;
+}
+
+.subheading {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 680px;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #0284c7 50%, var(--brand-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(4, 120, 87, 0.45);
+}
+
+.btn-secondary {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-medium);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--text-muted);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--brand-accent) 0%, #ea580c 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.btn-accent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+}
+
+.btn-outline {
+  border: 1.5px solid var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.btn-outline:hover {
+  background-color: var(--brand-primary-light);
+  color: var(--brand-primary-hover);
+}
+
+.btn-sm {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.btn-lg {
+  padding: 0.9rem 2rem;
+  font-size: 1.1rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Glassmorphism & Cards */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--bg-glass-border);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-lg);
+}
+
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s ease;
+}
+
+.card:hover {
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Form Styles */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-card);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.15);
+}
+
+.form-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-critical { background: var(--status-critical-bg); color: var(--status-critical); }
+.badge-high { background: var(--status-high-bg); color: var(--status-high); }
+.badge-medium { background: var(--status-medium-bg); color: var(--status-medium); }
+.badge-low { background: var(--status-low-bg); color: var(--status-low); }
+
+.badge-submitted { background: #dbeafe; color: #1d4ed8; }
+.badge-validated { background: #ede9fe; color: #6d28d9; }
+.badge-assigned { background: #fef3c7; color: #b45309; }
+.badge-inprogress { background: #cffafe; color: #0e7490; }
+.badge-resolved { background: #d1fae5; color: #047857; }
+
+/* Grid Layouts */
+.grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Header Navbar */
+.nav-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: var(--header-height);
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--bg-glass-border);
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--text-main);
+}
+
+.nav-logo-emblem {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(4, 120, 87, 0.3);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  list-style: none;
+}
+
+.nav-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.2s;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--brand-primary);
+  background-color: var(--brand-primary-light);
+}
+
+/* Role Selector Badge Bar */
+.role-bar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  padding: 0.4rem 0;
+  font-size: 0.82rem;
+}
+
+.role-bar-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.role-pill {
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  background: var(--bg-main);
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.role-pill.active {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: var(--brand-primary);
+}
+
+/* Custom Leaflet Map Container */
+.map-picker-container {
+  width: 100%;
+  height: 320px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1.5px solid var(--border-light);
+  z-index: 10;
+}
