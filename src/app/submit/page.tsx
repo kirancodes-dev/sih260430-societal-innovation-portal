@@ -42,6 +42,10 @@ export default function SubmitChallengePage() {
   const [isOffline, setIsOffline] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
 
+  // GPS Geolocation State
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsMessage, setGpsMessage] = useState<string | null>(null);
+
   // AI Triage State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AIClassificationResult | null>(null);
@@ -50,6 +54,43 @@ export default function SubmitChallengePage() {
 
   const currentDomainObj = THEMATIC_DOMAINS.find(d => d.id === selectedDomainId) || THEMATIC_DOMAINS[0];
   const currentDistrictObj = JHARKHAND_DISTRICTS.find(d => d.id === district) || JHARKHAND_DISTRICTS[0];
+
+  const handleDetectGpsLocation = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      alert("GPS Geolocation is not supported on this browser.");
+      return;
+    }
+    setGpsLoading(true);
+    setGpsMessage("Locating your coordinates...");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(4));
+        const lng = parseFloat(pos.coords.longitude.toFixed(4));
+        setGpsCoordinates([lat, lng]);
+
+        let nearest = JHARKHAND_DISTRICTS[0];
+        let minDist = 999;
+        for (const d of JHARKHAND_DISTRICTS) {
+          const dist = Math.hypot(d.coordinates[0] - lat, d.coordinates[1] - lng);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = d;
+          }
+        }
+        setDistrict(nearest.id);
+        if (nearest.blocks.length > 0) {
+          setBlock(nearest.blocks[0]);
+        }
+        setGpsLoading(false);
+        setGpsMessage(`✓ GPS Detected: ${nearest.name} (${lat}° N, ${lng}° E)`);
+      },
+      (err) => {
+        setGpsLoading(false);
+        setGpsMessage("Unable to retrieve GPS position. Please select manually.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
@@ -147,59 +188,71 @@ export default function SubmitChallengePage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!consentGiven) {
       alert("Please accept the data sharing and privacy policy consent.");
       return;
     }
 
+    setIsSaving(true);
     const newId = `CH-JH-2026-${Math.floor(100 + Math.random() * 900)}`;
     setGeneratedId(newId);
 
-    // Save directly to Cloud Firestore
-    createChallengeInDb({
-      id: newId,
-      title,
-      description,
-      category: currentDomainObj.title,
-      subcategory: selectedSubdomain,
-      district,
-      block,
-      locationCoordinates: gpsCoordinates,
-      priority: aiResult?.priority || "High",
-      priorityScore: aiResult?.priorityScore || 85,
-      status: "Submitted",
-      alignedSchemeIds: selectedSchemeId ? [selectedSchemeId] : [],
-      sdgGoals: aiResult?.sdgAlignment || [],
-      submittedBy: {
-        name: isAnonymous ? "Anonymous Citizen" : submitterName,
-        role: submitterRole,
-        contact: isAnonymous ? undefined : submitterContact,
-        anonymous: isAnonymous
-      },
-      mediaUrls: uploadedPhotos,
-      upvotes: 1,
-      views: 1
-    });
+    try {
+      // Save directly to Cloud Firestore and await sync
+      await createChallengeInDb({
+        id: newId,
+        title,
+        description,
+        category: currentDomainObj.title,
+        subcategory: selectedSubdomain || currentDomainObj.subcategories[0] || "General",
+        district,
+        block,
+        locationCoordinates: gpsCoordinates,
+        priority: aiResult?.priority || "High",
+        priorityScore: aiResult?.priorityScore || 85,
+        status: "Submitted",
+        alignedSchemeIds: selectedSchemeId ? [selectedSchemeId] : [],
+        sdgGoals: aiResult?.sdgAlignment || [],
+        submittedBy: {
+          name: isAnonymous ? "Anonymous Citizen" : (submitterName || "Citizen"),
+          role: submitterRole || "citizen",
+          contact: isAnonymous ? "" : (submitterContact || ""),
+          anonymous: isAnonymous
+        },
+        mediaUrls: uploadedPhotos,
+        upvotes: 1,
+        views: 1,
+        submittedAt: new Date().toISOString()
+      });
 
-    // Check if user is in simulated offline mode
-    if (isOffline) {
-      const queue = JSON.parse(localStorage.getItem("sih_offline_queue") || "[]");
-      queue.push({ id: newId, title, description, district, block, submittedAt: new Date().toISOString() });
-      localStorage.setItem("sih_offline_queue", JSON.stringify(queue));
-      setOfflineSaved(true);
+      // Check if user is in simulated offline mode
+      if (isOffline) {
+        const queue = JSON.parse(localStorage.getItem("sih_offline_queue") || "[]");
+        queue.push({ id: newId, title, description, district, block, submittedAt: new Date().toISOString() });
+        localStorage.setItem("sih_offline_queue", JSON.stringify(queue));
+        setOfflineSaved(true);
+      }
+
+      setIsSubmitted(true);
+
+      addNotification({
+        type: "challenge_submitted",
+        title: "Societal Challenge Logged",
+        body: `Challenge #${newId} recorded for ${currentDistrictObj.name}. State Triage & AI Routing initiated.`,
+        targetRole: "admin",
+        link: `/admin/review/${newId}`
+      });
+    } catch (err) {
+      console.error("Submission failed:", err);
+      alert("Failed to sync to database. Saved to offline queue.");
+      setIsSubmitted(true);
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsSubmitted(true);
-
-    addNotification({
-      type: "challenge_submitted",
-      title: "Societal Challenge Logged",
-      body: `Challenge #${newId} recorded for ${currentDistrictObj.name}. State Triage & AI Routing initiated.`,
-      targetRole: "admin",
-      link: `/admin/review/${newId}`
-    });
   };
 
   return (
@@ -279,10 +332,19 @@ export default function SubmitChallengePage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: "1rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
             <Link href="/my-submissions" className="btn btn-primary btn-lg">
               {language === "hi" ? "मेरी प्रस्तुतियां देखें →" : "Track My Submissions →"}
             </Link>
+            <a
+              href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`I just submitted a community challenge (#${generatedId}) for Jharkhand Societal Innovation: "${title}". Track its R&D resolution here: https://jharkhand-societal-innovation.web.app`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-lg"
+              style={{ background: "#25D366", color: "#ffffff", borderColor: "#25D366" }}
+            >
+              📲 Share on WhatsApp
+            </a>
             <button
               onClick={() => {
                 setIsSubmitted(false);
@@ -487,9 +549,26 @@ export default function SubmitChallengePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
               {/* Location & GIS Geotagging */}
               <div className="card">
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.8rem" }}>
-                  📍 {language === "hi" ? "स्थान व GIS जियोटैगिंग" : "Location & GIS Geotagging"}
-                </h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+                    📍 {language === "hi" ? "स्थान व GIS जियोटैगिंग" : "Location & GIS Geotagging"}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleDetectGpsLocation}
+                    disabled={gpsLoading}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: "0.78rem", background: "var(--brand-primary-light)", color: "var(--brand-primary)", border: "1px solid var(--brand-primary)" }}
+                  >
+                    {gpsLoading ? "📡 Detecting GPS..." : "📍 Auto-Detect GPS Location"}
+                  </button>
+                </div>
+
+                {gpsMessage && (
+                  <div style={{ fontSize: "0.78rem", padding: "0.4rem 0.6rem", background: "var(--bg-main)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-medium)", marginBottom: "0.75rem", color: "var(--brand-primary)", fontWeight: 600 }}>
+                    {gpsMessage}
+                  </div>
+                )}
 
                 <div className="grid-2" style={{ gap: "0.75rem", marginBottom: "1rem" }}>
                   <div>
@@ -544,12 +623,32 @@ export default function SubmitChallengePage() {
               {/* Multimedia Evidence */}
               <div className="card">
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.8rem" }}>
-                  📸 {language === "hi" ? "मल्टीमीडिया साक्ष्य" : "Multimedia Evidence & Test Data"}
+                  📸 {language === "hi" ? "मल्टीमीडिया साक्ष्य" : "Multimedia Evidence & Photos"}
                 </h3>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
                   <div>
-                    <label className="form-label">Upload Photos (Max 5, ≤5MB each)</label>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+                      <label className="form-label" style={{ margin: 0 }}>Photos (Max 5, ≤5MB)</label>
+                      <label
+                        htmlFor="camera-capture-input"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", cursor: "pointer" }}
+                      >
+                        📷 Open Camera
+                      </label>
+                    </div>
+
+                    <input
+                      id="camera-capture-input"
+                      type="file"
+                      accept="image/*"
+                      // @ts-ignore
+                      capture="environment"
+                      style={{ display: "none" }}
+                      onChange={handlePhotoUpload}
+                    />
+
                     <input
                       type="file"
                       accept="image/*"
@@ -583,7 +682,7 @@ export default function SubmitChallengePage() {
                     </div>
 
                     <div>
-                      <label className="form-label">Documents (Lab Reports / PDF ≤10MB)</label>
+                      <label className="form-label">Documents (PDF / Word ≤10MB)</label>
                       <input
                         type="file"
                         accept=".pdf,.doc,.docx"
@@ -680,10 +779,13 @@ export default function SubmitChallengePage() {
 
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className="btn btn-primary btn-lg"
                   style={{ width: "100%", justifyContent: "center" }}
                 >
-                  🚀 {language === "hi" ? "चुनौती राज्य पोर्टल पर दर्ज करें" : "Submit Challenge to State Portal"}
+                  {isSaving
+                    ? "⏳ " + (language === "hi" ? "डेटाबेस में सुरक्षित हो रहा है..." : "Syncing to Cloud Firestore...")
+                    : "🚀 " + (language === "hi" ? "चुनौती राज्य पोर्टल पर दर्ज करें" : "Submit Challenge to State Portal")}
                 </button>
               </div>
             </div>

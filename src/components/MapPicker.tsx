@@ -10,10 +10,24 @@ interface MapPickerProps {
   onLocationSelect?: (lat: number, lng: number) => void;
 }
 
+const POPULAR_LOCATIONS = [
+  { name: "Ranchi", id: "ranchi", coords: [23.3441, 85.3096] },
+  { name: "Latehar / Mahuadanr", id: "latehar", coords: [23.7438, 84.4984] },
+  { name: "Dhanbad / Jharia", id: "dhanbad", coords: [23.7957, 86.4304] },
+  { name: "Jamshedpur", id: "east-singhbhum", coords: [22.8046, 86.2029] },
+  { name: "Dumka (Santhal Pargana)", id: "dumka", coords: [24.2677, 87.2474] },
+  { name: "Chaibasa", id: "west-singhbhum", coords: [22.5519, 85.8078] },
+  { name: "Deoghar", id: "deoghar", coords: [24.4826, 86.7001] },
+  { name: "Hazaribagh", id: "hazaribagh", coords: [23.9937, 85.3644] },
+  { name: "Netarhat Hills", id: "latehar", coords: [23.4795, 84.2694] },
+  { name: "Bundu Link Road", id: "ranchi", coords: [23.1783, 85.5867] }
+];
+
 function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPickerProps) {
   const [position, setPosition] = useState<[number, number]>([23.7438, 84.4984]); // Default Latehar / Central JH
   const [mounted, setMounted] = useState(false);
   const [currentDistrict, setCurrentDistrict] = useState<DistrictInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -29,6 +43,16 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
     setCurrentDistrict(d);
     onDistrictChange?.(d.id);
     onLocationSelect?.(d.coordinates[0], d.coordinates[1]);
+  };
+
+  const handlePopularSelect = (loc: typeof POPULAR_LOCATIONS[0]) => {
+    setPosition([loc.coords[0], loc.coords[1]]);
+    onLocationSelect?.(loc.coords[0], loc.coords[1]);
+    const found = JHARKHAND_DISTRICTS.find(d => d.id === loc.id);
+    if (found) {
+      setCurrentDistrict(found);
+      onDistrictChange?.(found.id);
+    }
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -57,6 +81,30 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
     onDistrictChange?.(nearest.id);
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    const q = searchQuery.toLowerCase().trim();
+    // Search in popular locations
+    const pop = POPULAR_LOCATIONS.find(p => p.name.toLowerCase().includes(q));
+    if (pop) {
+      handlePopularSelect(pop);
+      return;
+    }
+
+    // Search in districts & blocks
+    const foundDist = JHARKHAND_DISTRICTS.find(d =>
+      d.name.toLowerCase().includes(q) ||
+      d.nameHi.includes(q) ||
+      d.blocks.some(b => b.toLowerCase().includes(q))
+    );
+
+    if (foundDist) {
+      handleDistrictSelect(foundDist);
+    }
+  };
+
   if (!mounted) {
     return (
       <div style={{ height: "300px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-main)", borderRadius: "var(--radius-md)" }}>
@@ -67,44 +115,104 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
 
   return (
     <div style={{ position: "relative", borderRadius: "var(--radius-md)", overflow: "hidden", border: "1.5px solid var(--border-medium)" }}>
-      {/* Top Map Status Bar */}
+      {/* Search & Tag Anywhere Header */}
       <div style={{
-        padding: "0.6rem 1rem",
+        padding: "0.75rem",
         background: "var(--bg-card)",
+        borderBottom: "1px solid var(--border-light)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.4rem" }}>
+          <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
+            🗺️ Tag Location Anywhere in Jharkhand
+          </div>
+          <span style={{ fontSize: "0.72rem", color: "var(--brand-primary)", fontWeight: 700 }}>
+            Tap map to drop pin wherever
+          </span>
+        </div>
+
+        {/* Location Search Bar */}
+        <form onSubmit={handleSearch} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem" }}>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Search village, block or landmark (e.g. Mahuadanr, Netarhat, Bundu, Jharia)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ fontSize: "0.82rem", padding: "0.45rem 0.75rem", flex: 1 }}
+          />
+          <button type="submit" className="btn btn-secondary btn-sm" style={{ padding: "0.45rem 0.75rem", fontSize: "0.78rem" }}>
+            🔍 Find
+          </button>
+        </form>
+
+        {/* Quick Location Chips */}
+        <div style={{
+          display: "flex",
+          gap: "0.35rem",
+          overflowX: "auto",
+          paddingBottom: "0.2rem",
+          scrollbarWidth: "none"
+        }}>
+          {POPULAR_LOCATIONS.map(p => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => handlePopularSelect(p)}
+              style={{
+                fontSize: "0.7rem",
+                padding: "0.2rem 0.55rem",
+                borderRadius: "var(--radius-full)",
+                background: currentDistrict?.id === p.id ? "var(--brand-primary)" : "var(--bg-main)",
+                color: currentDistrict?.id === p.id ? "#ffffff" : "var(--text-muted)",
+                border: "1px solid var(--border-medium)",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                fontWeight: currentDistrict?.id === p.id ? 800 : 500
+              }}
+            >
+              📍 {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Geotag Coordinates Status Ribbon */}
+      <div style={{
+        padding: "0.45rem 0.85rem",
+        background: "rgba(4, 120, 87, 0.08)",
         borderBottom: "1px solid var(--border-light)",
-        fontSize: "0.85rem",
+        fontSize: "0.8rem",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "0.5rem"
+        gap: "0.4rem"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span>📍 Geotagged: <strong>{currentDistrict ? currentDistrict.name : "Jharkhand State"}</strong></span>
-          <span style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-muted)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <span>📍 Tagged: <strong>{currentDistrict ? currentDistrict.name : "Jharkhand State"}</strong></span>
+          <span style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--brand-primary)", fontWeight: 700 }}>
             ({position[0].toFixed(4)}° N, {position[1].toFixed(4)}° E)
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span style={{
-            fontSize: "0.72rem",
-            color: "var(--brand-primary)",
-            background: "var(--brand-primary-light)",
-            padding: "0.15rem 0.5rem",
-            borderRadius: "var(--radius-full)",
-            fontWeight: 700
-          }}>
-            ✓ OpenStreetMap WGS84 Validated
-          </span>
-        </div>
+        <span style={{
+          fontSize: "0.7rem",
+          color: "var(--brand-primary)",
+          background: "#ffffff",
+          padding: "0.1rem 0.5rem",
+          borderRadius: "var(--radius-full)",
+          fontWeight: 800,
+          border: "1px solid var(--brand-primary)"
+        }}>
+          ✓ GPS Tag Active
+        </span>
       </div>
 
       {/* Interactive GIS Spatial Grid */}
       <div
         onClick={handleCanvasClick}
-        title="Click anywhere on the map to pin drop GPS coordinates"
+        title="Click or tap anywhere on the map to drop the GPS pin"
         style={{
-          height: "300px",
+          height: "280px",
           background: "radial-gradient(ellipse at center, #1e293b 0%, #090d16 100%)",
           position: "relative",
           cursor: "crosshair",
@@ -126,7 +234,7 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          fontSize: "5rem",
+          fontSize: "4.5rem",
           fontWeight: 900,
           color: "rgba(255, 255, 255, 0.03)",
           letterSpacing: "0.2em",
@@ -162,31 +270,28 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
               }}
             >
               <div style={{
-                width: isSelected ? "20px" : "10px",
-                height: isSelected ? "20px" : "10px",
+                width: isSelected ? "18px" : "9px",
+                height: isSelected ? "18px" : "9px",
                 borderRadius: "50%",
                 background: isSelected ? "var(--brand-accent)" : "var(--brand-primary)",
-                border: isSelected ? "3px solid #ffffff" : "1.5px solid rgba(255,255,255,0.8)",
-                boxShadow: isSelected ? "0 0 20px #f59e0b, 0 0 10px #f59e0b" : "0 0 6px rgba(0,0,0,0.6)",
+                border: isSelected ? "2.5px solid #ffffff" : "1.5px solid rgba(255,255,255,0.8)",
+                boxShadow: isSelected ? "0 0 16px #f59e0b" : "0 0 4px rgba(0,0,0,0.6)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#000",
-                fontSize: "0.65rem",
-                fontWeight: 900
+                fontSize: "0.6rem"
               }}>
                 {isSelected ? "📍" : ""}
               </div>
               <span style={{
-                fontSize: isSelected ? "0.75rem" : "0.65rem",
-                marginTop: "3px",
-                padding: "1px 5px",
+                fontSize: isSelected ? "0.72rem" : "0.62rem",
+                marginTop: "2px",
+                padding: "1px 4px",
                 background: isSelected ? "rgba(245, 158, 11, 0.95)" : "rgba(15, 23, 42, 0.75)",
-                borderRadius: "4px",
+                borderRadius: "3px",
                 color: isSelected ? "#000" : "#cbd5e1",
                 fontWeight: isSelected ? 800 : 500,
-                whiteSpace: "nowrap",
-                border: isSelected ? "1px solid #ffffff" : "1px solid rgba(255,255,255,0.1)"
+                whiteSpace: "nowrap"
               }}>
                 {d.name}
               </span>
@@ -194,7 +299,7 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           );
         })}
 
-        {/* Live Active Target Pin if user clicked arbitrary point */}
+        {/* Active Dropped Pin */}
         <div style={{
           position: "absolute",
           top: `${((25.5 - position[0]) / 3.5) * 80 + 10}%`,
@@ -207,9 +312,8 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           alignItems: "center"
         }}>
           <div style={{
-            fontSize: "1.6rem",
-            filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))",
-            animation: "bounce 1.5s infinite"
+            fontSize: "1.8rem",
+            filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.8))"
           }}>
             📍
           </div>
@@ -218,29 +322,28 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
         {/* Instruction Footer Overlay */}
         <div style={{
           position: "absolute",
-          bottom: "8px",
-          left: "10px",
-          right: "10px",
+          bottom: "6px",
+          left: "8px",
+          right: "8px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           pointerEvents: "none"
         }}>
           <span style={{
-            background: "rgba(0, 0, 0, 0.75)",
-            padding: "3px 8px",
+            background: "rgba(0, 0, 0, 0.8)",
+            padding: "2px 8px",
             borderRadius: "4px",
-            fontSize: "0.72rem",
-            color: "#94a3b8",
-            border: "1px solid rgba(255,255,255,0.1)"
+            fontSize: "0.68rem",
+            color: "#94a3b8"
           }}>
-            🎯 Click anywhere to drop GPS pin on district or block
+            🎯 Tap anywhere on map to pin location wherever the issue occurred
           </span>
           <span style={{
-            background: "rgba(0, 0, 0, 0.75)",
-            padding: "3px 8px",
+            background: "rgba(0, 0, 0, 0.8)",
+            padding: "2px 8px",
             borderRadius: "4px",
-            fontSize: "0.72rem",
+            fontSize: "0.68rem",
             color: "var(--brand-accent)",
             fontWeight: 700
           }}>

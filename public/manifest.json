@@ -1,0 +1,19 @@
+{
+  "name": "Jharkhand Societal Innovation Portal",
+  "short_name": "JH Innovate",
+  "description": "State Innovation Collaboration Portal (SICP) connecting Citizens, Universities & Industry.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#047857",
+  "theme_color": "#047857",
+  "categories": ["government", "education", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

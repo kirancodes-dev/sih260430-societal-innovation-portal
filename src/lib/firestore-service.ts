@@ -82,6 +82,21 @@ export async function seedInitialChallengesToFirestore(): Promise<number> {
   }
 }
 
+function cleanObject(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(cleanObject);
+  if (typeof obj === "object" && !(obj instanceof Date) && !(obj instanceof Timestamp)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanObject(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 /**
  * Create a new challenge in Firestore
  */
@@ -89,21 +104,24 @@ export async function createChallengeInDb(challengeData: Partial<ChallengeItem>)
   const challengeId = challengeData.id || `CH-JH-2026-${Math.floor(100 + Math.random() * 900)}`;
 
   if (!db) {
+    console.warn("Firestore db instance is not ready, returning fallback ID");
     return challengeId;
   }
 
   try {
-    const docRef = doc(db, CHALLENGES_COLLECTION, challengeId);
-    await setDoc(docRef, {
+    const payload = cleanObject({
       ...challengeData,
       id: challengeId,
-      submittedAt: new Date().toISOString(),
+      submittedAt: challengeData.submittedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-    console.log(`Document written to Firestore with ID: ${challengeId}`);
+
+    const docRef = doc(db, CHALLENGES_COLLECTION, challengeId);
+    await setDoc(docRef, payload, { merge: true });
+    console.log(`Document successfully written to Firestore with ID: ${challengeId}`);
     return challengeId;
   } catch (error) {
-    console.warn("Firestore save failed, using local offline queue:", error);
+    console.error("Firestore save error:", error);
     return challengeId;
   }
 }

@@ -13,143 +13,56 @@ export default function Navbar() {
   const { user, role, setRole, theme, toggleTheme } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-
   const [showNotifs, setShowNotifs] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const roleLabels: { role: UserRole; label: string; icon: string }[] = [
     { role: "admin", label: "Govt Admin", icon: "🏛️" },
     { role: "citizen", label: "Citizen / PRI", icon: "👨🏽‍🌾" },
-    { role: "university", label: "University Admin", icon: "🎓" },
+    { role: "university", label: "University", icon: "🎓" },
     { role: "faculty", label: "Faculty PI", icon: "👨‍🏫" },
-    { role: "student", label: "Student Lead", icon: "🧑‍🎓" },
-    { role: "industry", label: "Industry / CSR", icon: "🏭" }
+    { role: "student", label: "Student", icon: "🧑‍🎓" },
+    { role: "industry", label: "Industry", icon: "🏭" }
   ];
 
   return (
     <>
-      {/* Role Switcher Demo Bar (For Live Evaluators / State Nodal Officers) */}
-      <div className="role-bar">
-        <div className="container role-bar-container">
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--brand-primary)" }}>
-              🏛️ SIH 260430 • Govt of Jharkhand
-            </span>
-            <span style={{ color: "var(--text-light)" }}>|</span>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              Persona Switcher:
-            </span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
-            {roleLabels.map(r => (
-              <button
-                key={r.role}
-                onClick={() => setRole(r.role)}
-                className={`role-pill ${role === r.role ? "active" : ""}`}
-                title={`Switch view to ${r.label}`}
-              >
-                <span>{r.icon}</span> {r.label}
-              </button>
-            ))}
-
-            {/* Multilingual Switcher (English, Hindi, Santali Ol Chiki, Bengali) */}
-            <div style={{ display: "inline-flex", marginLeft: "0.4rem", borderRadius: "var(--radius-full)", border: "1px solid var(--border-medium)", overflow: "hidden", background: "var(--bg-main)" }}>
-              <button
-                onClick={() => setLanguage("en")}
-                style={{
-                  padding: "0.15rem 0.45rem",
-                  fontSize: "0.75rem",
-                  fontWeight: language === "en" ? 800 : 500,
-                  background: language === "en" ? "var(--brand-primary)" : "transparent",
-                  color: language === "en" ? "#ffffff" : "var(--text-muted)",
-                  border: "none",
-                  cursor: "pointer"
-                }}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => setLanguage("hi")}
-                style={{
-                  padding: "0.15rem 0.45rem",
-                  fontSize: "0.75rem",
-                  fontWeight: language === "hi" ? 800 : 500,
-                  background: language === "hi" ? "var(--brand-primary)" : "transparent",
-                  color: language === "hi" ? "#ffffff" : "var(--text-muted)",
-                  border: "none",
-                  cursor: "pointer"
-                }}
-              >
-                हिन्दी
-              </button>
-              <button
-                onClick={() => setLanguage("sat")}
-                style={{
-                  padding: "0.15rem 0.45rem",
-                  fontSize: "0.75rem",
-                  fontWeight: language === "sat" ? 800 : 500,
-                  background: language === "sat" ? "var(--brand-primary)" : "transparent",
-                  color: language === "sat" ? "#ffffff" : "var(--text-muted)",
-                  border: "none",
-                  cursor: "pointer"
-                }}
-                title="Santali (Ol Chiki)"
-              >
-                ᱥᱟᱱᱛᱟᱲᱤ
-              </button>
-              <button
-                onClick={() => setLanguage("bn")}
-                style={{
-                  padding: "0.15rem 0.45rem",
-                  fontSize: "0.75rem",
-                  fontWeight: language === "bn" ? 800 : 500,
-                  background: language === "bn" ? "var(--brand-primary)" : "transparent",
-                  color: language === "bn" ? "#ffffff" : "var(--text-muted)",
-                  border: "none",
-                  cursor: "pointer"
-                }}
-                title="Bengali"
-              >
-                বাংলা
-              </button>
-            </div>
-
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              style={{
-                marginLeft: "0.3rem",
-                padding: "0.15rem 0.45rem",
-                borderRadius: "var(--radius-full)",
-                border: "1px solid var(--border-medium)",
-                fontSize: "0.75rem",
-                background: "var(--bg-main)",
-                color: "var(--text-main)",
-                cursor: "pointer"
-              }}
-              title="Toggle Dark / Light Theme"
-            >
-              {theme === "light" ? "🌙" : "☀️"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Navigation Header */}
+      {/* Clean Main App Header */}
       <header className="nav-header">
         <div className="container nav-container">
-          <Link href="/" className="nav-logo">
-            <div className="nav-logo-emblem">JH</div>
-            <div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 800, lineHeight: 1.1 }}>
-                {t.portalTitle}
-              </div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {t.portalSubtitle}
-              </div>
-            </div>
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Link href="/" className="nav-logo" onClick={() => setMobileMenuOpen(false)}>
+              <div className="nav-logo-emblem">JH</div>
+              <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
+                JH Innovate
+              </span>
+            </Link>
 
+            {/* Officer & Analyser Portal Login Button (Backend Workers Only) */}
+            <Link
+              href="/login"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                padding: "0.22rem 0.55rem",
+                background: "var(--brand-primary-light)",
+                border: "1px solid var(--brand-primary)",
+                borderRadius: "var(--radius-full)",
+                fontSize: "0.7rem",
+                fontWeight: 800,
+                color: "var(--brand-primary)",
+                textDecoration: "none",
+                whiteSpace: "nowrap"
+              }}
+              title="Official Portal for Dept Officers & Evaluators (Not for Public)"
+            >
+              <span>🔐</span>
+              <span>Officer Login</span>
+            </Link>
+          </div>
+
+          {/* Desktop Navigation */}
           <nav className="desktop-nav">
             <ul className="nav-links">
               <li>
@@ -230,7 +143,31 @@ export default function Navbar() {
           </nav>
 
           {/* Right Action Bar */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {/* Language Switch Button */}
+            <button
+              onClick={() => {
+                const nextLang = language === "hi" ? "sat" : language === "sat" ? "bn" : language === "bn" ? "en" : "hi";
+                setLanguage(nextLang);
+              }}
+              style={{
+                background: "var(--bg-main)",
+                border: "1px solid var(--border-medium)",
+                borderRadius: "var(--radius-full)",
+                padding: "0.25rem 0.6rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                cursor: "pointer",
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                color: "var(--brand-primary)"
+              }}
+              title="Change Language (हिन्दी / English / ᱥᱟᱱᱛᱟᱲᱤ / বাংলা)"
+            >
+              🌐 {language === "hi" ? "हिन्दी" : language === "sat" ? "ᱥᱟᱱᱛᱟᱲᱤ" : language === "bn" ? "বাংলা" : "EN"}
+            </button>
+
             {/* Notification Bell */}
             <div style={{ position: "relative" }}>
               <button
@@ -256,7 +193,7 @@ export default function Navbar() {
                     position: "absolute",
                     top: "-3px",
                     right: "-3px",
-                    background: "var(--brand-danger)",
+                    background: "var(--brand-danger, #e11d48)",
                     color: "#ffffff",
                     fontSize: "0.65rem",
                     fontWeight: 800,
@@ -275,11 +212,11 @@ export default function Navbar() {
                   position: "absolute",
                   right: 0,
                   top: "45px",
-                  width: "320px",
-                  maxHeight: "400px",
+                  width: "290px",
+                  maxHeight: "380px",
                   overflowY: "auto",
-                  padding: "1rem",
-                  zIndex: 1000,
+                  padding: "0.9rem",
+                  zIndex: 1100,
                   border: "1px solid var(--border-medium)"
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
@@ -330,27 +267,94 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* User Persona Avatar */}
-            {user && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "1.4rem" }}>{user.avatar || "👤"}</span>
-                <div style={{ textAlign: "left", display: "none" }} className="user-text-meta">
-                  <div style={{ fontSize: "0.85rem", fontWeight: 700, lineHeight: 1.1 }}>
-                    {user.displayName.split(" ")[0]}
-                  </div>
-                  <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
-                    {user.role.toUpperCase()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <Link href="/submit" className="btn btn-primary btn-sm">
-              + {language === "hi" ? "चुनौती दर्ज करें" : language === "sat" ? "ᱚᱞ ᱢᱮ" : "New Challenge"}
+            {/* Desktop Quick Submit Button */}
+            <Link href="/submit" className="btn btn-primary btn-sm desktop-submit-btn">
+              + {language === "hi" ? "चुनौती दर्ज" : language === "sat" ? "ᱚᱞ ᱢᱮ" : "New Challenge"}
             </Link>
+
+            {/* Mobile Hamburger Toggle Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="mobile-hamburger-btn"
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? "✕" : "☰"}
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Mobile Slide-Out Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div className="mobile-menu-drawer animate-fade-in">
+          <div className="mobile-drawer-content">
+            {/* Persona Switcher in Mobile Drawer */}
+            <div style={{ marginBottom: "1.25rem" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                Switch Persona / View:
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.4rem" }}>
+                {roleLabels.map(r => (
+                  <button
+                    key={r.role}
+                    onClick={() => {
+                      setRole(r.role);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`role-pill ${role === r.role ? "active" : ""}`}
+                    style={{ padding: "0.4rem 0.5rem", fontSize: "0.75rem", textAlign: "left", display: "flex", alignItems: "center", gap: "0.4rem" }}
+                  >
+                    <span>{r.icon}</span> {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Main Links */}
+            <div className="mobile-drawer-nav">
+              <Link href="/" className={`mobile-drawer-link ${pathname === "/" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>🏠</span> {t.navHome}
+              </Link>
+              <Link href="/submit" className={`mobile-drawer-link ${pathname === "/submit" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>📢</span> {t.navSubmit}
+              </Link>
+              <Link href="/consultations" className={`mobile-drawer-link ${pathname === "/consultations" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>🗳️</span> Policy Deliberations
+              </Link>
+              <Link href="/participatory-budgeting" className={`mobile-drawer-link ${pathname === "/participatory-budgeting" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>💰</span> Citizen Budget Voting
+              </Link>
+              <Link href="/accountability" className={`mobile-drawer-link ${pathname === "/accountability" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>📊</span> Real-Time Tracking & SLAs
+              </Link>
+              <Link href="/admin" className={`mobile-drawer-link ${pathname.startsWith("/admin") ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>🏛️</span> {t.navAdmin}
+              </Link>
+              <Link href="/university" className={`mobile-drawer-link ${pathname === "/university" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>🎓</span> {t.navUniversity}
+              </Link>
+              <Link href="/industry" className={`mobile-drawer-link ${pathname.startsWith("/industry") ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>🏭</span> {t.navIndustry}
+              </Link>
+              <Link href="/training" className={`mobile-drawer-link ${pathname === "/training" ? "active" : ""}`} onClick={() => setMobileMenuOpen(false)}>
+                <span>📚</span> {t.navTraining}
+              </Link>
+            </div>
+
+            {/* Quick Action in Mobile Menu */}
+            <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <Link
+                href="/submit"
+                className="btn btn-primary"
+                style={{ width: "100%", justifyContent: "center", padding: "0.85rem" }}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                📢 {language === "hi" ? "नई चुनौती दर्ज करें" : "Report a Community Issue"}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

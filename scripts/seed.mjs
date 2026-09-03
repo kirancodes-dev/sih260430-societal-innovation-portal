@@ -99,6 +99,57 @@ const SAMPLE_CHALLENGES = [
     alignedSchemeIds: ["jharkhand-solar-policy"],
     sdgGoals: ["SDG 15: Life on Land", "SDG 13: Climate Action"],
     submittedAt: new Date().toISOString()
+  },
+  {
+    id: "CH-JH-2026-006",
+    title: "Collapsed Culvert & Dangerous Potholes on Rural Link Road connecting Bundu to Ranchi",
+    description: "Heavy monsoon floods washed away the masonry culvert on the Bundu-Tamar arterial link. Over 14,000 villagers and school buses are stranded with no emergency ambulance access. Urgent modular bridge design required.",
+    category: "Urban Infrastructure & Smart Mobility",
+    subcategory: "Roads & Bridges",
+    district: "ranchi",
+    block: "Bundu",
+    locationCoordinates: [23.1783, 85.5867],
+    priority: "Critical",
+    priorityScore: 95,
+    status: "Under_Review",
+    assignedUniversityName: "Birla Institute of Technology (BIT) Mesra",
+    alignedSchemeIds: ["pmgsy"],
+    sdgGoals: ["SDG 9: Industry, Innovation and Infrastructure", "SDG 11: Sustainable Cities and Communities"],
+    submittedAt: new Date().toISOString()
+  },
+  {
+    id: "CH-JH-2026-007",
+    title: "Frequent Grid Outages & Defunct Solar Street Lighting in Netarhat Hilly Forest Hamlets",
+    description: "Latehar and Gumla border hill villages remain in total darkness for 18 hours a day. Need smart microgrid with battery storage telemetry to power community health posts and school dormitories.",
+    category: "Clean Energy & Rural Electrification",
+    subcategory: "Solar Microgrid & Telemetry",
+    district: "latehar",
+    block: "Garu",
+    locationCoordinates: [23.4795, 84.2694],
+    priority: "High",
+    priorityScore: 88,
+    status: "In_Progress",
+    assignedUniversityName: "NIT Jamshedpur",
+    alignedSchemeIds: ["jharkhand-solar-policy"],
+    sdgGoals: ["SDG 7: Affordable and Clean Energy"],
+    submittedAt: new Date().toISOString()
+  },
+  {
+    id: "CH-JH-2026-008",
+    title: "High Turbidity & Iron Sediments in Drinking Tubewells across Palamu Tribal Belts",
+    description: "Daltonganj rural drinking water sources show iron levels exceeding 4.2 mg/L causing gastrointestinal distress among children. Need gravity-fed sand and activated charcoal community filters.",
+    category: "Water Resources & Sanitation",
+    subcategory: "Iron Removal Filters",
+    district: "palamu",
+    block: "Daltonganj",
+    locationCoordinates: [24.0375, 84.0674],
+    priority: "High",
+    priorityScore: 92,
+    status: "Assigned",
+    assignedUniversityName: "IIT (ISM) Dhanbad",
+    alignedSchemeIds: ["jal-jeevan-mission"],
+    sdgGoals: ["SDG 6: Clean Water & Sanitation"],
+    submittedAt: new Date().toISOString()
   }
 ];
 

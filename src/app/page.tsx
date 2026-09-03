@@ -1,18 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   THEMATIC_DOMAINS,
   INITIAL_MOCK_CHALLENGES,
   JHARKHAND_UNIVERSITIES,
   SAMPLE_INDUSTRY_PARTNERS,
-  JHARKHAND_DISTRICTS
+  JHARKHAND_DISTRICTS,
+  ChallengeItem
 } from "@/lib/constants";
 import StatsCard from "@/components/ui/StatsCard";
 import ChallengeCard from "@/components/ui/ChallengeCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getChallengesFromDb } from "@/lib/firestore-service";
 
 export default function HomePage() {
   const { role } = useAuth();
@@ -20,8 +22,27 @@ export default function HomePage() {
   const [selectedDomain, setSelectedDomain] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
+  const [challenges, setChallenges] = useState<ChallengeItem[]>(INITIAL_MOCK_CHALLENGES);
+  const [loadingDb, setLoadingDb] = useState(false);
 
-  const filteredChallenges = INITIAL_MOCK_CHALLENGES.filter(c => {
+  useEffect(() => {
+    async function loadData() {
+      setLoadingDb(true);
+      try {
+        const liveData = await getChallengesFromDb();
+        if (liveData && liveData.length > 0) {
+          setChallenges(liveData);
+        }
+      } catch (err) {
+        console.warn("Using offline mock challenges:", err);
+      } finally {
+        setLoadingDb(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const filteredChallenges = challenges.filter(c => {
     const matchesDomain = selectedDomain === "all" || c.category === selectedDomain;
     const matchesDistrict = selectedDistrict === "all" || c.district === selectedDistrict;
     const matchesQuery = !searchQuery ||
@@ -30,10 +51,149 @@ export default function HomePage() {
     return matchesDomain && matchesDistrict && matchesQuery;
   });
 
+  const isHindi = language === "hi";
+
   return (
-    <div>
-      {/* Hero Section */}
-      <section style={{
+    <div className="home-root">
+      {/* 📱 Mobile App Home Banner & Action Hub (Visible on Mobile) */}
+      <div className="mobile-only-app-hero">
+        {/* Welcome Card */}
+        <div className="mobile-app-welcome-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span className="mobile-app-badge">🏛️ Govt of Jharkhand • NEP 2020</span>
+              <h1 style={{ fontSize: "1.45rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.2, marginTop: "0.3rem" }}>
+                {isHindi ? "झारखंड सामाजिक नवाचार पोर्टल" : "Jharkhand Societal Innovation"}
+              </h1>
+              <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.85)", marginTop: "0.25rem", lineHeight: 1.4 }}>
+                {isHindi ? "नागरिक समस्याओं का विश्वविद्यालयों व उद्योगों द्वारा तकनीकी समाधान" : "Solving grassroots challenges through Academic R&D & Industry CSR."}
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Action Tiles (2x2 Native Mobile Grid) */}
+          <div className="mobile-app-quick-actions">
+            <Link href="/submit" className="mobile-app-action-tile highlight-green">
+              <span className="tile-icon">📢</span>
+              <div className="tile-text">
+                <strong>{isHindi ? "समस्या दर्ज करें" : "Report Issue"}</strong>
+                <span>{isHindi ? "GPS व फोटो सहित" : "With GPS & Camera"}</span>
+              </div>
+            </Link>
+
+            <Link href="/consultations" className="mobile-app-action-tile highlight-blue">
+              <span className="tile-icon">🗳️</span>
+              <div className="tile-text">
+                <strong>{isHindi ? "नीति विमर्श" : "Deliberation"}</strong>
+                <span>{isHindi ? "राय व सुझाव दें" : "Community Voices"}</span>
+              </div>
+            </Link>
+
+            <Link href="/participatory-budgeting" className="mobile-app-action-tile highlight-gold">
+              <span className="tile-icon">💰</span>
+              <div className="tile-text">
+                <strong>{isHindi ? "बजट वोटिंग" : "Citizen Voting"}</strong>
+                <span>{isHindi ? "जिले का बजट तय करें" : "Vote on Grants"}</span>
+              </div>
+            </Link>
+
+            <Link href="/accountability" className="mobile-app-action-tile highlight-purple">
+              <span className="tile-icon">📊</span>
+              <div className="tile-text">
+                <strong>{isHindi ? "जवाबदेही" : "Live Tracking"}</strong>
+                <span>{isHindi ? "स्थिति व प्रगति देखें" : "Track SLAs & Labs"}</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* Horizontal Category Scroll (Native Mobile Category Carousel) */}
+        <div style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", padding: "0 0.25rem" }}>
+            <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)" }}>
+              {isHindi ? "विषयगत क्षेत्र चुनें" : "Thematic Domains"}
+            </span>
+            <span style={{ fontSize: "0.75rem", color: "var(--brand-primary)", fontWeight: 700 }}>
+              {THEMATIC_DOMAINS.length} Domains
+            </span>
+          </div>
+
+          <div className="mobile-horizontal-scroll">
+            <button
+              onClick={() => setSelectedDomain("all")}
+              className={`mobile-category-chip ${selectedDomain === "all" ? "active" : ""}`}
+            >
+              🌐 {isHindi ? "सभी" : "All"} ({challenges.length})
+            </button>
+            {THEMATIC_DOMAINS.map(d => {
+              const isActive = selectedDomain === d.title;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => setSelectedDomain(isActive ? "all" : d.title)}
+                  className={`mobile-category-chip ${isActive ? "active" : ""}`}
+                >
+                  <span>{d.icon}</span> {isHindi ? d.titleHi : d.title}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Quick Search on Mobile */}
+        <div style={{ margin: "0.75rem 0" }}>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              placeholder={isHindi ? "🔍 समस्या या जिला खोजें..." : "🔍 Search problems, hand pumps, roads..."}
+              className="form-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                borderRadius: "var(--radius-full)",
+                paddingLeft: "1.2rem",
+                paddingRight: "2.5rem",
+                height: "44px",
+                background: "var(--bg-card)",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{ position: "absolute", right: "12px", top: "12px", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "0.9rem" }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick District Filter Chips */}
+        <div className="mobile-horizontal-scroll" style={{ marginBottom: "1rem" }}>
+          <button
+            onClick={() => setSelectedDistrict("all")}
+            className={`mobile-district-chip ${selectedDistrict === "all" ? "active" : ""}`}
+          >
+            📍 {isHindi ? "सभी 24 जिले" : "All 24 Districts"}
+          </button>
+          {JHARKHAND_DISTRICTS.slice(0, 10).map(dist => {
+            const isActive = selectedDistrict === dist.id;
+            return (
+              <button
+                key={dist.id}
+                onClick={() => setSelectedDistrict(isActive ? "all" : dist.id)}
+                className={`mobile-district-chip ${isActive ? "active" : ""}`}
+              >
+                {dist.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 🖥️ Desktop Hero Section (Visible on Tablet/Desktop) */}
+      <section className="desktop-only-hero" style={{
         background: "linear-gradient(180deg, rgba(4, 120, 87, 0.08) 0%, rgba(248, 250, 252, 0) 100%)",
         paddingTop: "3.5rem",
         paddingBottom: "4rem",
@@ -77,7 +237,7 @@ export default function HomePage() {
           <div className="grid-4" style={{ textAlign: "left" }}>
             <StatsCard
               title={t.challengesReceived}
-              value="1,428"
+              value={`${challenges.length + 1420}`}
               icon="📋"
               change="+14% this month"
               subtitle="From all 24 districts"
@@ -111,8 +271,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 10 Thematic Domains Section */}
-      <section style={{ padding: "4rem 0", background: "var(--bg-main)", borderBottom: "1px solid var(--border-light)" }}>
+      {/* 10 Thematic Domains Section (Desktop) */}
+      <section className="desktop-only-section" style={{ padding: "4rem 0", background: "var(--bg-main)", borderBottom: "1px solid var(--border-light)" }}>
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "3rem" }}>
             <h2 className="heading-section">
@@ -192,26 +352,26 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Explorer & Challenges Section */}
-      <section id="explore" style={{ padding: "4rem 0" }}>
+      {/* Explorer & Challenges Feed Section */}
+      <section id="explore" style={{ padding: "2.5rem 0" }}>
         <div className="container">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
             <div>
-              <h2 className="heading-section">
-                {t.recentChallenges}
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 800, margin: 0 }}>
+                {isHindi ? "ताज़ा सामाजिक चुनौतियां" : "Recent Community Challenges"}
               </h2>
-              <p className="subheading" style={{ margin: 0 }}>
-                Explore live societal problems submitted by Gram Sabhas, Urban Local Bodies, and citizens across Jharkhand.
-              </p>
+              <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                Showing {filteredChallenges.length} validated issues across Jharkhand
+              </span>
             </div>
 
-            <Link href="/submit" className="btn btn-primary btn-sm">
-              + {language === "hi" ? "समस्या दर्ज करें" : "Submit Challenge"}
+            <Link href="/submit" className="btn btn-primary btn-sm desktop-only-btn">
+              + {isHindi ? "समस्या दर्ज करें" : "Submit Challenge"}
             </Link>
           </div>
 
-          {/* Search & Filter Controls */}
-          <div className="card" style={{ marginBottom: "2rem", padding: "1.25rem" }}>
+          {/* Desktop Search & Filter Controls */}
+          <div className="card desktop-only-filter" style={{ marginBottom: "2rem", padding: "1.25rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
               <div>
                 <label className="form-label" style={{ fontSize: "0.78rem" }}>Search Keywords</label>
@@ -282,8 +442,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Tripartite Ecosystem Stakeholders Section */}
-      <section style={{ padding: "4rem 0", background: "var(--bg-main)", borderTop: "1px solid var(--border-light)" }}>
+      {/* Tripartite Ecosystem Stakeholders Section (Desktop) */}
+      <section className="desktop-only-section" style={{ padding: "4rem 0", background: "var(--bg-main)", borderTop: "1px solid var(--border-light)" }}>
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "3rem" }}>
             <h2 className="heading-section">
