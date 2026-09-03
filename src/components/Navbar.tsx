@@ -10,20 +10,11 @@ import { UserRole } from "@/lib/constants";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { user, role, setRole, theme, toggleTheme } = useAuth();
+  const { user, role } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [showNotifs, setShowNotifs] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const roleLabels: { role: UserRole; label: string; icon: string }[] = [
-    { role: "admin", label: "Govt Admin", icon: "🏛️" },
-    { role: "citizen", label: "Citizen / PRI", icon: "👨🏽‍🌾" },
-    { role: "university", label: "University", icon: "🎓" },
-    { role: "faculty", label: "Faculty PI", icon: "👨‍🏫" },
-    { role: "student", label: "Student", icon: "🧑‍🎓" },
-    { role: "industry", label: "Industry", icon: "🏭" }
-  ];
 
   return (
     <>
@@ -110,7 +101,7 @@ export default function Navbar() {
                 </>
               )}
 
-              {(role === "university" || role === "faculty" || role === "student") && (
+              {(role === "university_admin" || role === "faculty" || role === "student" || role === "research") && (
                 <>
                   <li>
                     <Link href="/university" className={`nav-link ${pathname === "/university" ? "active" : ""}`}>
@@ -288,26 +279,22 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="mobile-menu-drawer animate-fade-in">
           <div className="mobile-drawer-content">
-            {/* Persona Switcher in Mobile Drawer */}
-            <div style={{ marginBottom: "1.25rem" }}>
-              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-                Switch Persona / View:
+            {/* Official Auth Link in Mobile Drawer */}
+            <div style={{ marginBottom: "1.25rem", padding: "0.75rem", background: "var(--brand-primary-light)", borderRadius: "var(--radius-md)" }}>
+              <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--brand-primary)", marginBottom: "0.3rem" }}>
+                {user ? `👤 ${user.displayName}` : "🏛️ Official Officer Portal"}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.4rem" }}>
-                {roleLabels.map(r => (
-                  <button
-                    key={r.role}
-                    onClick={() => {
-                      setRole(r.role);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`role-pill ${role === r.role ? "active" : ""}`}
-                    style={{ padding: "0.4rem 0.5rem", fontSize: "0.75rem", textAlign: "left", display: "flex", alignItems: "center", gap: "0.4rem" }}
-                  >
-                    <span>{r.icon}</span> {r.label}
-                  </button>
-                ))}
+              <div style={{ fontSize: "0.75rem", color: "var(--text-main)", marginBottom: "0.5rem" }}>
+                {user ? `Role: ${role.toUpperCase()}` : "For Government Officers, Evaluators & Researchers"}
               </div>
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="btn btn-primary btn-sm"
+                style={{ width: "100%", justifyContent: "center", fontSize: "0.78rem" }}
+              >
+                {user ? "Switch / Exit Account" : "🔐 Officer Sign In / Demo"}
+              </Link>
             </div>
 
             {/* Main Links */}

@@ -114,7 +114,7 @@ export default function GovernmentIntegrationsPage() {
             Government Systems Interoperability Hub
           </h1>
           <p className="subheading">
-            Live telemetry sync with Chief Minister's Dashboard, e-District citizen portals, DigiLocker / NAD student innovation credentials, and ISRO Bhuvan GIS spatial layers.
+            Live telemetry sync with Chief Minister&apos;s Dashboard, e-District citizen portals, DigiLocker / NAD student innovation credentials, and ISRO Bhuvan GIS spatial layers.
           </p>
         </div>
 

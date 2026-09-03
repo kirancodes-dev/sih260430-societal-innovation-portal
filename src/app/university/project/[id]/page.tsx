@@ -141,16 +141,72 @@ export default function UniversityProjectWorkspacePage() {
     }
   };
 
-  const handleSaveProposal = (e: React.FormEvent) => {
+  const handleSaveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProposalSaved(true);
-    addNotification({
-      type: "proposal_submitted",
-      title: "Proposal Submitted for State Review",
-      body: `BIT Mesra submitted proposal for ${challenge.id} (Budget: ₹${budgetCr} Cr).`,
-      targetRole: "admin",
-      link: `/admin/review/${challenge.id}`
-    });
+    if (!isMultidisciplinary) {
+      alert("NEP 2020 Compliance Error: The team must have members from at least 2 distinct academic departments.");
+      return;
+    }
+
+    try {
+      const { createProposal } = await import("@/lib/repositories/proposal-repository");
+      const { sendNotification } = await import("@/lib/services/notification-service");
+
+      await createProposal({
+        challengeId: challenge.id,
+        universityId: "univ-bit-mesra",
+        universityName: "Birla Institute of Technology (BIT) Mesra",
+        facultyPI: {
+          name: teamMembers[0]?.name || "Dr. Anirban Roy",
+          email: teamMembers[0]?.email || "anirban@bitmesra.ac.in",
+          department: teamMembers[0]?.dept || "Chemical & Environmental Engg"
+        },
+        participatingDepartments: uniqueDepartments,
+        teamMembers: teamMembers.map(m => ({
+          id: m.id,
+          name: m.name,
+          role: m.role.toLowerCase().replace(/\s+/g, "_") as any,
+          department: m.dept,
+          email: m.email
+        })),
+        methodology,
+        expectedOutcomes: expectedImpact,
+        requiredResources,
+        totalBudgetINR: parseFloat(budgetCr) * 10000000,
+        budgetBreakdown: [
+          { category: "Hardware & Prototype Fabrication", amountINR: 1200000, justification: "Electro-coagulation cell & laterite column" },
+          { category: "Field Testing & Water Quality Kits", amountINR: 500000, justification: "BIS 10500 testing & telemetry sensors" },
+          { category: "Student Research Stipends (NEP 2020)", amountINR: 700000, justification: "3 Student leads (4 credits each)" }
+        ],
+        milestones: milestones.map(m => ({
+          id: `ms-${m.id}`,
+          name: m.title,
+          targetDate: m.deadline,
+          status: m.status === "Completed" ? "Completed" : "Pending",
+          progressPercent: m.completionPct
+        }))
+      }, {
+        uid: "faculty-bit-roy",
+        displayName: "Dr. Anirban Roy (Faculty PI)",
+        role: "faculty",
+        email: "anirban@bitmesra.ac.in"
+      });
+
+      setProposalSaved(true);
+
+      await sendNotification(
+        "R&D Proposal Submitted for State Review",
+        `BIT Mesra submitted multidisciplinary proposal for ${challenge.id} (Budget: ₹${budgetCr} Cr).`,
+        "status",
+        undefined,
+        "admin",
+        `/admin/review/${challenge.id}`,
+        challenge.id
+      );
+    } catch (err: any) {
+      console.warn("Proposal submission failed:", err);
+      alert(err.message || "Failed submitting proposal");
+    }
   };
 
   return (

@@ -4,8 +4,11 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { THEMATIC_DOMAINS, JHARKHAND_DISTRICTS, JHARKHAND_STATE_SCHEMES, UN_SDGS } from "@/lib/constants";
 import MapPicker from "@/components/MapPicker";
-import { classifySocietalProblem, AIClassificationResult } from "@/lib/ai-classifier";
-import { createChallengeInDb } from "@/lib/firestore-service";
+import { createChallenge } from "@/lib/repositories/challenge-repository";
+import { uploadEvidenceFile } from "@/lib/storage-service";
+import { enqueueOfflineSubmission } from "@/lib/offline-queue";
+import { sendNotification } from "@/lib/services/notification-service";
+import { EvidenceFile } from "@/types/portal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 
@@ -29,10 +32,10 @@ export default function SubmitChallengePage() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [consentGiven, setConsentGiven] = useState(true);
 
-  // Multimedia Files
-  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
-  const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
-  const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
+  // Multimedia Evidence Files & Upload Progress
+  const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Voice-to-Text Speech Recognition State
   const [isListening, setIsListening] = useState(false);
@@ -48,7 +51,7 @@ export default function SubmitChallengePage() {
 
   // AI Triage State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<AIClassificationResult | null>(null);
+  const [aiResult, setAiResult] = useState<any | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [generatedId, setGeneratedId] = useState("");
 
@@ -84,7 +87,7 @@ export default function SubmitChallengePage() {
         setGpsLoading(false);
         setGpsMessage(`✓ GPS Detected: ${nearest.name} (${lat}° N, ${lng}° E)`);
       },
-      (err) => {
+      () => {
         setGpsLoading(false);
         setGpsMessage("Unable to retrieve GPS position. Please select manually.");
       },
@@ -150,15 +153,27 @@ export default function SubmitChallengePage() {
     if (!title || description.length < 20) return;
     setIsAnalyzing(true);
     try {
-      const result = await classifySocietalProblem(title, description, district, block);
-      setAiResult(result);
-      const foundDomain = THEMATIC_DOMAINS.find(d => d.title === result.category);
-      if (foundDomain) {
-        setSelectedDomainId(foundDomain.id);
-        setSelectedSubdomain(result.subcategory);
-      }
-      if (result.alignedStateSchemes.length > 0) {
-        setSelectedSchemeId(result.alignedStateSchemes[0].id);
+      const resp = await fetch("/api/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          district: currentDistrictObj.name,
+          block
+        })
+      });
+      if (resp.ok) {
+        const result = await resp.json();
+        setAiResult(result);
+        const foundDomain = THEMATIC_DOMAINS.find(d => d.title.toLowerCase().includes(result.category.toLowerCase()));
+        if (foundDomain) {
+          setSelectedDomainId(foundDomain.id);
+          setSelectedSubdomain(result.subcategory);
+        }
+        if (result.alignedStateSchemeIds?.length > 0) {
+          setSelectedSchemeId(result.alignedStateSchemeIds[0]);
+        }
       }
     } catch (e) {
       console.error("AI Analysis error:", e);
@@ -167,24 +182,23 @@ export default function SubmitChallengePage() {
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files).slice(0, 5);
-      const names = files.map(f => f.name);
-      setUploadedPhotos(prev => [...prev, ...names].slice(0, 5));
-    }
-  };
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setUploadError(null);
+    const files = Array.from(e.target.files);
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setUploadedVideo(e.target.files[0].name);
-    }
-  };
-
-  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const names = Array.from(e.target.files).map(f => f.name);
-      setUploadedDocs(prev => [...prev, ...names]);
+    for (const file of files) {
+      try {
+        setUploadProgress(10);
+        const uploaded = await uploadEvidenceFile(file, `temp-${Date.now()}`, (pct) => {
+          setUploadProgress(pct);
+        });
+        setEvidenceFiles(prev => [...prev, uploaded]);
+        setUploadProgress(null);
+      } catch (err: any) {
+        setUploadError(err.message || "Upload failed");
+        setUploadProgress(null);
+      }
     }
   };
 
@@ -198,57 +212,64 @@ export default function SubmitChallengePage() {
     }
 
     setIsSaving(true);
-    const newId = `CH-JH-2026-${Math.floor(100 + Math.random() * 900)}`;
-    setGeneratedId(newId);
 
     try {
-      // Save directly to Cloud Firestore and await sync
-      await createChallengeInDb({
-        id: newId,
+      const challengePayload = {
         title,
         description,
-        category: currentDomainObj.title,
+        domain: currentDomainObj.title,
         subcategory: selectedSubdomain || currentDomainObj.subcategories[0] || "General",
         district,
         block,
+        address,
         locationCoordinates: gpsCoordinates,
         priority: aiResult?.priority || "High",
         priorityScore: aiResult?.priorityScore || 85,
-        status: "Submitted",
-        alignedSchemeIds: selectedSchemeId ? [selectedSchemeId] : [],
-        sdgGoals: aiResult?.sdgAlignment || [],
+        status: "submitted" as const,
         submittedBy: {
           name: isAnonymous ? "Anonymous Citizen" : (submitterName || "Citizen"),
-          role: submitterRole || "citizen",
+          role: submitterRole,
           contact: isAnonymous ? "" : (submitterContact || ""),
-          anonymous: isAnonymous
+          isAnonymous
         },
-        mediaUrls: uploadedPhotos,
-        upvotes: 1,
-        views: 1,
-        submittedAt: new Date().toISOString()
-      });
+        isAnonymous,
+        evidenceFiles,
+        aiTriage: aiResult,
+        alignedSchemeIds: selectedSchemeId ? [selectedSchemeId] : []
+      };
 
-      // Check if user is in simulated offline mode
       if (isOffline) {
-        const queue = JSON.parse(localStorage.getItem("sih_offline_queue") || "[]");
-        queue.push({ id: newId, title, description, district, block, submittedAt: new Date().toISOString() });
-        localStorage.setItem("sih_offline_queue", JSON.stringify(queue));
+        const idempotencyKey = await enqueueOfflineSubmission(challengePayload);
+        setGeneratedId(idempotencyKey);
         setOfflineSaved(true);
+      } else {
+        const newId = await createChallenge(challengePayload);
+        setGeneratedId(newId);
+
+        await sendNotification(
+          "Societal Challenge Logged",
+          `Challenge #${newId} recorded for ${currentDistrictObj.name}. State Triage & AI Routing initiated.`,
+          "status",
+          undefined,
+          "admin",
+          `/admin/review/${newId}`,
+          newId
+        );
       }
 
       setIsSubmitted(true);
-
-      addNotification({
-        type: "challenge_submitted",
-        title: "Societal Challenge Logged",
-        body: `Challenge #${newId} recorded for ${currentDistrictObj.name}. State Triage & AI Routing initiated.`,
-        targetRole: "admin",
-        link: `/admin/review/${newId}`
-      });
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Failed to sync to database. Saved to offline queue.");
+      // Fallback to offline queue
+      const offlineId = await enqueueOfflineSubmission({
+        title,
+        description,
+        district,
+        block,
+        domain: currentDomainObj.title
+      });
+      setGeneratedId(offlineId);
+      setOfflineSaved(true);
       setIsSubmitted(true);
     } finally {
       setIsSaving(false);
@@ -351,7 +372,7 @@ export default function SubmitChallengePage() {
                 setTitle("");
                 setDescription("");
                 setAiResult(null);
-                setUploadedPhotos([]);
+                setEvidenceFiles([]);
               }}
               className="btn btn-secondary btn-lg"
             >
@@ -629,7 +650,7 @@ export default function SubmitChallengePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
-                      <label className="form-label" style={{ margin: 0 }}>Photos (Max 5, ≤5MB)</label>
+                      <label className="form-label" style={{ margin: 0 }}>Photos / Evidence (Max 10MB each)</label>
                       <label
                         htmlFor="camera-capture-input"
                         className="btn btn-secondary btn-sm"
@@ -643,60 +664,68 @@ export default function SubmitChallengePage() {
                       id="camera-capture-input"
                       type="file"
                       accept="image/*"
-                      // @ts-ignore
                       capture="environment"
                       style={{ display: "none" }}
-                      onChange={handlePhotoUpload}
+                      onChange={handleFileUpload}
                     />
 
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,video/mp4,application/pdf"
                       multiple
-                      onChange={handlePhotoUpload}
+                      onChange={handleFileUpload}
                       className="form-input"
                       style={{ padding: "0.4rem" }}
                     />
-                    {uploadedPhotos.length > 0 && (
-                      <div style={{ fontSize: "0.8rem", color: "var(--brand-primary)", marginTop: "0.3rem" }}>
-                        ✓ {uploadedPhotos.length} photo(s) attached: {uploadedPhotos.join(", ")}
+
+                    {uploadProgress !== null && (
+                      <div style={{ marginTop: "0.4rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "var(--brand-primary)", fontWeight: 700, marginBottom: "0.2rem" }}>
+                          <span>Uploading to Firebase Storage...</span>
+                          <span>{uploadProgress}%</span>
+                        </div>
+                        <div style={{ height: "6px", background: "var(--border-light)", borderRadius: "3px", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${uploadProgress}%`, background: "var(--brand-primary)", transition: "width 0.2s" }} />
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  <div className="grid-2" style={{ gap: "0.75rem" }}>
-                    <div>
-                      <label className="form-label">Video (≤50MB, MP4/WebM)</label>
-                      <input
-                        type="file"
-                        accept="video/mp4,video/webm"
-                        onChange={handleVideoUpload}
-                        className="form-input"
-                        style={{ padding: "0.4rem" }}
-                      />
-                      {uploadedVideo && (
-                        <div style={{ fontSize: "0.75rem", color: "var(--brand-primary)", marginTop: "0.2rem" }}>
-                          ✓ Video attached: {uploadedVideo}
-                        </div>
-                      )}
-                    </div>
+                    {uploadError && (
+                      <div style={{ fontSize: "0.75rem", color: "var(--status-critical)", marginTop: "0.3rem" }}>
+                        ⚠️ {uploadError}
+                      </div>
+                    )}
 
-                    <div>
-                      <label className="form-label">Documents (PDF / Word ≤10MB)</label>
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx"
-                        multiple
-                        onChange={handleDocUpload}
-                        className="form-input"
-                        style={{ padding: "0.4rem" }}
-                      />
-                      {uploadedDocs.length > 0 && (
-                        <div style={{ fontSize: "0.75rem", color: "var(--brand-primary)", marginTop: "0.2rem" }}>
-                          ✓ {uploadedDocs.length} doc(s) attached
-                        </div>
-                      )}
-                    </div>
+                    {evidenceFiles.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: "0.5rem" }}>
+                        {evidenceFiles.map((ev, idx) => (
+                          <div
+                            key={ev.id || idx}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              background: "var(--bg-main)",
+                              padding: "0.35rem 0.6rem",
+                              borderRadius: "var(--radius-sm)",
+                              border: "1px solid var(--border-medium)",
+                              fontSize: "0.78rem"
+                            }}
+                          >
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "220px" }}>
+                              📎 {ev.name} ({(ev.sizeBytes / 1024).toFixed(0)} KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceFiles(prev => prev.filter((_, i) => i !== idx))}
+                              style={{ background: "none", border: "none", color: "var(--status-critical)", cursor: "pointer", fontWeight: 700 }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -729,18 +758,20 @@ export default function SubmitChallengePage() {
                   </div>
 
                   {/* Token Weights Explanation */}
-                  <div style={{ marginBottom: "0.8rem" }}>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.3rem" }}>
-                      Key Token Explanations (Feature Importance):
+                  {aiResult.tokenWeights && (
+                    <div style={{ marginBottom: "0.8rem" }}>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.3rem" }}>
+                        Key Token Explanations (Feature Importance):
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                        {aiResult.tokenWeights.map((tw: any, idx: number) => (
+                          <span key={idx} style={{ fontSize: "0.72rem", padding: "0.15rem 0.5rem", background: "var(--bg-main)", borderRadius: "4px", border: "1px solid var(--border-medium)" }}>
+                            <strong>{tw.token}</strong> ({Math.round(tw.weight * 100)}%)
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      {aiResult.tokenWeights.map((tw, idx) => (
-                        <span key={idx} style={{ fontSize: "0.72rem", padding: "0.15rem 0.5rem", background: "var(--bg-main)", borderRadius: "4px", border: "1px solid var(--border-medium)" }}>
-                          <strong>{tw.token}</strong> ({Math.round(tw.weight * 100)}%)
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  )}
 
                   {/* UN SDGs Tagging */}
                   <div style={{ marginBottom: "0.8rem" }}>
@@ -748,7 +779,7 @@ export default function SubmitChallengePage() {
                       Matched UN Sustainable Development Goals (SDGs):
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                      {aiResult.sdgAlignment.map((sdg, idx) => (
+                      {(aiResult.sdgAlignment || []).map((sdg: string, idx: number) => (
                         <span key={idx} className="badge badge-assigned" style={{ fontSize: "0.72rem" }}>
                           🌐 {sdg}
                         </span>

@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /challenges/{challengeId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                   && (
+                     request.resource.contentType.matches('image/.*') ||
+                     request.resource.contentType.matches('video/.*') ||
+                     request.resource.contentType == 'application/pdf'
+                   );
+    }
+
+    match /proposals/{proposalId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 20 * 1024 * 1024;
+    }
+  }
+}

@@ -368,7 +368,7 @@ export default function ParticipatoryConsultationsPage() {
                     </div>
 
                     <p style={{ fontSize: "0.85rem", color: "var(--text-main)", lineHeight: 1.4, margin: "0 0 0.5rem 0" }}>
-                      "{arg.text}"
+                      &ldquo;{arg.text}&rdquo;
                     </p>
 
                     <div style={{ fontSize: "0.72rem", color: "var(--text-light)" }}>

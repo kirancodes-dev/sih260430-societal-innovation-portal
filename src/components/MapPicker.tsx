@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { JHARKHAND_DISTRICTS, DistrictInfo } from "@/lib/constants";
 
@@ -23,51 +23,17 @@ const POPULAR_LOCATIONS = [
   { name: "Bundu Link Road", id: "ranchi", coords: [23.1783, 85.5867] }
 ];
 
-function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPickerProps) {
-  const [position, setPosition] = useState<[number, number]>([23.7438, 84.4984]); // Default Latehar / Central JH
-  const [mounted, setMounted] = useState(false);
+function LeafletMapComponent({ district, onDistrictChange, onLocationSelect }: MapPickerProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+
+  const [position, setPosition] = useState<[number, number]>([23.7438, 84.4984]);
   const [currentDistrict, setCurrentDistrict] = useState<DistrictInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [tileError, setTileError] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    const found = JHARKHAND_DISTRICTS.find(d => d.id === district);
-    if (found) {
-      setPosition(found.coordinates);
-      setCurrentDistrict(found);
-    }
-  }, [district]);
-
-  const handleDistrictSelect = (d: DistrictInfo) => {
-    setPosition(d.coordinates);
-    setCurrentDistrict(d);
-    onDistrictChange?.(d.id);
-    onLocationSelect?.(d.coordinates[0], d.coordinates[1]);
-  };
-
-  const handlePopularSelect = (loc: typeof POPULAR_LOCATIONS[0]) => {
-    setPosition([loc.coords[0], loc.coords[1]]);
-    onLocationSelect?.(loc.coords[0], loc.coords[1]);
-    const found = JHARKHAND_DISTRICTS.find(d => d.id === loc.id);
-    if (found) {
-      setCurrentDistrict(found);
-      onDistrictChange?.(found.id);
-    }
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-
-    // Approximate Jharkhand bounding box: Lat [22.0 to 25.5], Lng [83.3 to 87.9]
-    const lat = parseFloat((25.5 - y * 3.5).toFixed(4));
-    const lng = parseFloat((83.3 + x * 4.6).toFixed(4));
-
-    setPosition([lat, lng]);
-    onLocationSelect?.(lat, lng);
-
-    // Find nearest district
+  const updateNearestDistrict = (lat: number, lng: number) => {
     let nearest = JHARKHAND_DISTRICTS[0];
     let minDist = 999;
     for (const d of JHARKHAND_DISTRICTS) {
@@ -81,19 +47,121 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
     onDistrictChange?.(nearest.id);
   };
 
+  // Initialize Leaflet map safely on mount
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapContainerRef.current) return;
+
+    let isMounted = true;
+
+    // Dynamically import leaflet to prevent SSR window reference error
+    import("leaflet").then((L) => {
+      if (!isMounted || !mapContainerRef.current) return;
+
+      // Fix default marker icon issue in Next.js
+      const DefaultIcon = L.icon({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+      L.Marker.prototype.options.icon = DefaultIcon;
+
+      if (!mapInstanceRef.current) {
+        const found = JHARKHAND_DISTRICTS.find(d => d.id === district);
+        const initialCoords: [number, number] = found ? found.coordinates : [23.7438, 84.4984];
+
+        const map = L.map(mapContainerRef.current, {
+          center: initialCoords,
+          zoom: 9,
+          scrollWheelZoom: false
+        });
+
+        const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 18
+        });
+
+        tileLayer.on("tileerror", () => {
+          setTileError(true);
+        });
+
+        tileLayer.addTo(map);
+
+        const marker = L.marker(initialCoords, { draggable: true }).addTo(map);
+
+        marker.on("dragend", () => {
+          const newPos = marker.getLatLng();
+          const lat = parseFloat(newPos.lat.toFixed(4));
+          const lng = parseFloat(newPos.lng.toFixed(4));
+          setPosition([lat, lng]);
+          onLocationSelect?.(lat, lng);
+          updateNearestDistrict(lat, lng);
+        });
+
+        map.on("click", (e: any) => {
+          const lat = parseFloat(e.latlng.lat.toFixed(4));
+          const lng = parseFloat(e.latlng.lng.toFixed(4));
+          marker.setLatLng([lat, lng]);
+          setPosition([lat, lng]);
+          onLocationSelect?.(lat, lng);
+          updateNearestDistrict(lat, lng);
+        });
+
+        mapInstanceRef.current = map;
+        markerRef.current = marker;
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update map when district prop changes from external selects
+  useEffect(() => {
+    const found = JHARKHAND_DISTRICTS.find(d => d.id === district);
+    if (found) {
+      setCurrentDistrict(found);
+      setPosition(found.coordinates);
+      if (mapInstanceRef.current && markerRef.current) {
+        mapInstanceRef.current.setView(found.coordinates, 10);
+        markerRef.current.setLatLng(found.coordinates);
+      }
+    }
+  }, [district]);
+
+  const handlePopularSelect = (loc: typeof POPULAR_LOCATIONS[0]) => {
+    setPosition([loc.coords[0], loc.coords[1]]);
+    onLocationSelect?.(loc.coords[0], loc.coords[1]);
+    const found = JHARKHAND_DISTRICTS.find(d => d.id === loc.id);
+    if (found) {
+      setCurrentDistrict(found);
+      onDistrictChange?.(found.id);
+    }
+    if (mapInstanceRef.current && markerRef.current) {
+      mapInstanceRef.current.setView(loc.coords, 11);
+      markerRef.current.setLatLng(loc.coords);
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
     const q = searchQuery.toLowerCase().trim();
-    // Search in popular locations
     const pop = POPULAR_LOCATIONS.find(p => p.name.toLowerCase().includes(q));
     if (pop) {
       handlePopularSelect(pop);
       return;
     }
 
-    // Search in districts & blocks
     const foundDist = JHARKHAND_DISTRICTS.find(d =>
       d.name.toLowerCase().includes(q) ||
       d.nameHi.includes(q) ||
@@ -101,32 +169,24 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
     );
 
     if (foundDist) {
-      handleDistrictSelect(foundDist);
+      handlePopularSelect({
+        name: foundDist.name,
+        id: foundDist.id,
+        coords: foundDist.coordinates
+      });
     }
   };
 
-  if (!mounted) {
-    return (
-      <div style={{ height: "300px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-main)", borderRadius: "var(--radius-md)" }}>
-        Loading interactive Jharkhand GIS Map & Spatial Geotagger...
-      </div>
-    );
-  }
-
   return (
     <div style={{ position: "relative", borderRadius: "var(--radius-md)", overflow: "hidden", border: "1.5px solid var(--border-medium)" }}>
-      {/* Search & Tag Anywhere Header */}
-      <div style={{
-        padding: "0.75rem",
-        background: "var(--bg-card)",
-        borderBottom: "1px solid var(--border-light)"
-      }}>
+      {/* Top Search & Controls Header */}
+      <div style={{ padding: "0.75rem", background: "var(--bg-card)", borderBottom: "1px solid var(--border-light)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.4rem" }}>
           <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
-            🗺️ Tag Location Anywhere in Jharkhand
+            🗺️ Real OpenStreetMap GIS Geotagger
           </div>
           <span style={{ fontSize: "0.72rem", color: "var(--brand-primary)", fontWeight: 700 }}>
-            Tap map to drop pin wherever
+            Click map or drag marker to tag location
           </span>
         </div>
 
@@ -135,7 +195,7 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           <input
             type="text"
             className="form-input"
-            placeholder="Search village, block or landmark (e.g. Mahuadanr, Netarhat, Bundu, Jharia)..."
+            placeholder="Search village, landmark, or block (e.g. Mahuadanr, Netarhat, Bundu, Jharia)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ fontSize: "0.82rem", padding: "0.45rem 0.75rem", flex: 1 }}
@@ -145,14 +205,8 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           </button>
         </form>
 
-        {/* Quick Location Chips */}
-        <div style={{
-          display: "flex",
-          gap: "0.35rem",
-          overflowX: "auto",
-          paddingBottom: "0.2rem",
-          scrollbarWidth: "none"
-        }}>
+        {/* Quick Shortcut Location Chips */}
+        <div style={{ display: "flex", gap: "0.35rem", overflowX: "auto", paddingBottom: "0.2rem", scrollbarWidth: "none" }}>
           {POPULAR_LOCATIONS.map(p => (
             <button
               key={p.name}
@@ -176,7 +230,7 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
         </div>
       </div>
 
-      {/* Geotag Coordinates Status Ribbon */}
+      {/* Geotag Ribbon */}
       <div style={{
         padding: "0.45rem 0.85rem",
         background: "rgba(4, 120, 87, 0.08)",
@@ -203,158 +257,46 @@ function MapComponent({ district, onDistrictChange, onLocationSelect }: MapPicke
           fontWeight: 800,
           border: "1px solid var(--brand-primary)"
         }}>
-          ✓ GPS Tag Active
+          ✓ OpenStreetMap WGS84 Validated
         </span>
       </div>
 
-      {/* Interactive GIS Spatial Grid */}
+      {/* Real Leaflet Map Container */}
       <div
-        onClick={handleCanvasClick}
-        title="Click or tap anywhere on the map to drop the GPS pin"
+        ref={mapContainerRef}
         style={{
-          height: "280px",
-          background: "radial-gradient(ellipse at center, #1e293b 0%, #090d16 100%)",
+          height: "300px",
+          width: "100%",
           position: "relative",
-          cursor: "crosshair",
-          overflow: "hidden",
-          userSelect: "none"
+          zIndex: 1
         }}
-      >
-        {/* Spatial Grid Lines */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)",
-          backgroundSize: "25px 25px"
-        }} />
+      />
 
-        {/* State Boundary Outline Watermark */}
+      {tileError && (
         <div style={{
           position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          fontSize: "4.5rem",
-          fontWeight: 900,
-          color: "rgba(255, 255, 255, 0.03)",
-          letterSpacing: "0.2em",
-          pointerEvents: "none"
+          bottom: "10px",
+          left: "10px",
+          right: "10px",
+          background: "rgba(15, 23, 42, 0.9)",
+          color: "#fff",
+          padding: "0.4rem 0.8rem",
+          borderRadius: "6px",
+          fontSize: "0.72rem",
+          zIndex: 1000
         }}>
-          JHARKHAND
+          ⚠️ OpenStreetMap tile network slow. Coordinate pin tracking remains 100% active.
         </div>
-
-        {/* 24 District Node Markers */}
-        {JHARKHAND_DISTRICTS.map((d) => {
-          const isSelected = currentDistrict?.id === d.id;
-          const topPercent = ((25.5 - d.coordinates[0]) / 3.5) * 80 + 10;
-          const leftPercent = ((d.coordinates[1] - 83.3) / 4.6) * 80 + 10;
-
-          return (
-            <div
-              key={d.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDistrictSelect(d);
-              }}
-              style={{
-                position: "absolute",
-                top: `${topPercent}%`,
-                left: `${leftPercent}%`,
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                transform: "translate(-50%, -50%)",
-                zIndex: isSelected ? 20 : 5,
-                transition: "all 0.2s ease"
-              }}
-            >
-              <div style={{
-                width: isSelected ? "18px" : "9px",
-                height: isSelected ? "18px" : "9px",
-                borderRadius: "50%",
-                background: isSelected ? "var(--brand-accent)" : "var(--brand-primary)",
-                border: isSelected ? "2.5px solid #ffffff" : "1.5px solid rgba(255,255,255,0.8)",
-                boxShadow: isSelected ? "0 0 16px #f59e0b" : "0 0 4px rgba(0,0,0,0.6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.6rem"
-              }}>
-                {isSelected ? "📍" : ""}
-              </div>
-              <span style={{
-                fontSize: isSelected ? "0.72rem" : "0.62rem",
-                marginTop: "2px",
-                padding: "1px 4px",
-                background: isSelected ? "rgba(245, 158, 11, 0.95)" : "rgba(15, 23, 42, 0.75)",
-                borderRadius: "3px",
-                color: isSelected ? "#000" : "#cbd5e1",
-                fontWeight: isSelected ? 800 : 500,
-                whiteSpace: "nowrap"
-              }}>
-                {d.name}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Active Dropped Pin */}
-        <div style={{
-          position: "absolute",
-          top: `${((25.5 - position[0]) / 3.5) * 80 + 10}%`,
-          left: `${((position[1] - 83.3) / 4.6) * 80 + 10}%`,
-          transform: "translate(-50%, -100%)",
-          pointerEvents: "none",
-          zIndex: 30,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center"
-        }}>
-          <div style={{
-            fontSize: "1.8rem",
-            filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.8))"
-          }}>
-            📍
-          </div>
-        </div>
-
-        {/* Instruction Footer Overlay */}
-        <div style={{
-          position: "absolute",
-          bottom: "6px",
-          left: "8px",
-          right: "8px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          pointerEvents: "none"
-        }}>
-          <span style={{
-            background: "rgba(0, 0, 0, 0.8)",
-            padding: "2px 8px",
-            borderRadius: "4px",
-            fontSize: "0.68rem",
-            color: "#94a3b8"
-          }}>
-            🎯 Tap anywhere on map to pin location wherever the issue occurred
-          </span>
-          <span style={{
-            background: "rgba(0, 0, 0, 0.8)",
-            padding: "2px 8px",
-            borderRadius: "4px",
-            fontSize: "0.68rem",
-            color: "var(--brand-accent)",
-            fontWeight: 700
-          }}>
-            24 Districts Spatial Grid
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-export default dynamic(() => Promise.resolve(MapComponent), {
-  ssr: false
+export default dynamic(() => Promise.resolve(LeafletMapComponent), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: "300px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-main)", borderRadius: "var(--radius-md)", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+      🗺️ Initializing OpenStreetMap GIS tiles & WGS84 spatial markers...
+    </div>
+  )
 });

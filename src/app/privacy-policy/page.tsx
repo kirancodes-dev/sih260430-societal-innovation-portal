@@ -13,9 +13,39 @@ export default function DPDPPrivacyCompliancePage() {
   const [dsarSubmitted, setDsarSubmitted] = useState(false);
   const [requestDetails, setRequestDetails] = useState("");
 
-  const handleDSARSubmit = (e: React.FormEvent) => {
+  const handleDSARSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDsarSubmitted(true);
+
+    try {
+      const { db } = await import("@/lib/firebase");
+      const { collection, addDoc } = await import("firebase/firestore");
+      const { logAuditEvent } = await import("@/lib/repositories/audit-repository");
+
+      if (db) {
+        await addDoc(collection(db, "privacyRequests"), {
+          userId: user?.uid || "anonymous",
+          email: user?.email || "citizen@dpdp.jharkhand.gov.in",
+          name: user?.displayName || "Citizen Data Principal",
+          requestType: dsarType,
+          details: requestDetails || "General data subject request under DPDP Act 2023",
+          status: "submitted",
+          submittedAt: new Date().toISOString()
+        });
+      }
+
+      await logAuditEvent(
+        user?.uid || "citizen-anonymous",
+        user?.displayName || "Citizen",
+        user?.role || "citizen",
+        `DPDP_DSAR_REQUEST_${dsarType.toUpperCase()}`,
+        "privacy",
+        `dsar-${Date.now()}`,
+        { requestType: dsarType }
+      );
+    } catch (err) {
+      console.warn("Failed recording DSAR to Firestore:", err);
+    }
   };
 
   return (

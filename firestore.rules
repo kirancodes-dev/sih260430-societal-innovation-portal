@@ -2,8 +2,84 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isUniversity() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['university_admin', 'faculty', 'student', 'research'] ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['university_admin', 'faculty', 'student', 'research']
+      );
+    }
+
+    // Challenges collection
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create: if true; // Open intake for rural citizens & PRI
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Proposals collection
+    match /proposals/{proposalId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Partnerships collection
+    match /partnerships/{partnershipId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // MoUs collection
+    match /mous/{mouId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Audit Logs - Strictly append-only, tamper-evident
+    match /auditLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if true;
+      allow update, delete: if false; // Immutable!
+    }
+
+    // Privacy Requests
+    match /privacyRequests/{reqId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update: if isAdmin();
+      allow delete: if false;
     }
   }
 }

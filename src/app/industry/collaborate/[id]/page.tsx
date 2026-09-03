@@ -28,18 +28,71 @@ export default function IndustryCollaborationDetailPage() {
   const [showMouPreview, setShowMouPreview] = useState(false);
   const [committed, setCommitted] = useState(false);
 
-  const handleCommit = (e: React.FormEvent) => {
+  const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCommitted(true);
-    addNotification({
-      type: "industry_interest",
-      title: "Industry CSR Partnership Committed",
-      body: `Tata Steel CSR pledged ₹${fundingPledgeLakhs} Lakhs and ${mentorshipHours} mentorship hours for Project ${challenge.id}.`,
-      targetRole: "university"
-    });
-    setTimeout(() => {
-      router.push("/industry");
-    }, 2000);
+
+    try {
+      const { createPartnershipOffer, createMoUAcknowledgement } = await import("@/lib/repositories/partnership-repository");
+      const { sendNotification } = await import("@/lib/services/notification-service");
+
+      await createPartnershipOffer({
+        challengeId: challenge.id,
+        industryId: "ind-tata-steel",
+        industryName: "Tata Steel CSR & Innovation Hub",
+        partnerType: "csr",
+        offerType: "funding",
+        fundingAmountINR: parseFloat(fundingPledgeLakhs) * 100000,
+        mentorshipDescription: `${mentorName} (${mentorshipHours} hrs)`,
+        equipmentDescription: facilitiesOffered,
+        pilotLocation: "Latehar District Rural Blocks"
+      }, {
+        uid: "demo-ind-tata",
+        displayName: "Ananya Sengupta (VP Innovation & CSR Grants)",
+        role: "industry",
+        email: "csr.jharkhand@tatasteel.com"
+      });
+
+      await createMoUAcknowledgement({
+        challengeId: challenge.id,
+        proposalId: `PROP-${challenge.id}-01`,
+        universityId: "univ-bit-mesra",
+        universityName: "Birla Institute of Technology (BIT) Mesra",
+        industryId: "ind-tata-steel",
+        industryName: "Tata Steel CSR & Innovation Hub",
+        stateNodalOfficerName: "Dr. Arvind Kumar, IAS (State Nodal Officer)",
+        termsSummary: `CSR Grant ₹${fundingPledgeLakhs} Lakhs, ${mentorshipHours} mentorship hours, pilot testing support.`,
+        financialCommitmentINR: parseFloat(fundingPledgeLakhs) * 100000,
+        iprSharingTerms: ipTerms,
+        status: "acknowledged",
+        signedAcknowledgementTimestamp: new Date().toISOString(),
+        signedByIndustryRep: eSignName
+      }, {
+        uid: "demo-ind-tata",
+        displayName: "Ananya Sengupta (VP Innovation & CSR Grants)",
+        role: "industry",
+        email: "csr.jharkhand@tatasteel.com"
+      });
+
+      await sendNotification(
+        "Industry CSR Partnership Committed",
+        `Tata Steel CSR pledged ₹${fundingPledgeLakhs} Lakhs and ${mentorshipHours} mentorship hours for Project ${challenge.id}.`,
+        "info",
+        undefined,
+        "faculty",
+        `/university/project/${challenge.id}`,
+        challenge.id
+      );
+
+      setTimeout(() => {
+        router.push("/industry");
+      }, 1500);
+    } catch (err) {
+      console.warn("Commit failed:", err);
+      setTimeout(() => {
+        router.push("/industry");
+      }, 1500);
+    }
   };
 
   return (

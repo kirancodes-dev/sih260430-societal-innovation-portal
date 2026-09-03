@@ -17,7 +17,7 @@ export default function StatusBadge({ status, type = "status" }: StatusBadgeProp
 
   const normalized = status.toLowerCase().replace("_", "");
   let badgeClass = "badge badge-submitted";
-  let label = status.replace("_", " ");
+  const label = status.replace("_", " ");
 
   if (normalized.includes("valid")) badgeClass = "badge badge-validated";
   else if (normalized.includes("assign")) badgeClass = "badge badge-assigned";
